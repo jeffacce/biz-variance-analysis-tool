@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html style="height: 100%">
+<head>
+    <title>Variance Analysis (Rate/Mix Waterfall) Toolkit</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.0/dist/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" crossorigin="anonymous"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ho+j7jyWK8fNQe+A12Hb8AhRq26LrZ/JpcUGGOn+Y7RsweNrtN/tE3MoK7ZeZDyx" crossorigin="anonymous"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename="scripts/papaparse.min.js") }}"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts@4.9.0/dist/echarts.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts@4.9.0/dist/extension/dataTool.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/sortablejs@1.13.0/Sortable.min.js"></script>
+    <script type="text/javascript" src="https://kit.fontawesome.com/730d62440c.js" crossorigin="anonymous"></script>
+    <style>
+        #raw-data-old, #raw-data-new {
+            font-size: 14px;
+            resize: none;
+            font-family: "Consolas","Monaco","Lucida Console","Liberation Mono","DejaVu Sans Mono","Bitstream Vera Sans Mono","Courier New", monospace;
+        }
+        .list-group-item.card {
+            cursor: move;
+        }
+        .list-group-item.card.bg-light {
+            cursor: default;
+        }
+    </style>
+</head>
+
+<body style="height: 100%; overflow: hidden;">
+    <nav class="navbar navbar-dark bg-dark mb-2">
+        <a class="navbar-brand" href='/'>Variance Analysis (Rate/Mix Waterfall) Toolkit</a>
+    </nav>
+
+    <div class="row m-2" style="height: 100%;">
+        <div class="container m-0 col-4 pt-2 border-right" style="overflow: auto; height: 90%">
+            <nav>
+                <div class="nav nav-tabs nav-fill nav-pills mb-2 border-bottom" id="nav-tab" role="tablist">
+                    <a class="nav-item nav-link active" id="nav-data-old-tab" data-toggle="tab" href="#nav-data-old" role="tab" aria-controls="data-old" aria-selected="true">Data: last period</a>
+                    <a class="nav-item nav-link" id="nav-data-new-tab" data-toggle="tab" href="#nav-data-new" role="tab" aria-controls="data-new" aria-selected="false">Data: this period</a>
+                    <a class="nav-item nav-link" id="nav-options-tab" data-toggle="tab" href="#nav-options" role="tab" aria-controls="options" aria-selected="false">Options</a>
+                </div>
+            </nav>
+            <form>
+                <div>
+                    <div class="input-group mt-2 mb-2 justify-content-end">
+                        <button type="button" class="btn btn-primary" id="submit-button">
+                            <div class="spinner-border spinner-border-sm" role="status" id="spinner-running" hidden>
+                                <span class="sr-only">Running...</span>
+                            </div>
+                            Calculate
+                        </button>
+                    </div>
+                
+                    <div class="tab-content" id="myTabContent">
+                        <div class="tab-pane fade show active" id="nav-data-old" role="tabpanel" aria-labelledby="nav-data-old-tab">
+                            <h5>Data: last period</h5>
+                            <p class="text-primary"><small>
+                                Choose or paste in CSV.<br />
+                                Format: <strong>one row of headers, followed by data.</strong>
+                            </small></p>
+                            <div class="input-group mb-1">
+                                <input type="file" class="custom-file-input" id="raw-data-old-file-input">
+                                <label class="custom-file-label" for="raw-data-old-file-input" id="raw-data-old-file-label">Choose file</label>
+                            </div>
+                            <textarea class="form-control" rows=20 id="raw-data-old"></textarea>
+                        </div>
+
+                        <div class="tab-pane fade" id="nav-data-new" role="tabpanel" aria-labelledby="nav-data-new-tab">
+                            <h5>Data: this period</h5>
+                            <p class="text-primary"><small>
+                                Choose or paste in CSV.<br />
+                                Format: <strong>one row of headers, followed by data.</strong>
+                            </small></p>
+                            <div class="input-group mb-1">
+                                <input type="file" class="custom-file-input" id="raw-data-new-file-input">
+                                <label class="custom-file-label" for="raw-data-new-file-input" id="raw-data-new-file-label">Choose file</label>
+                            </div>
+                            <textarea class="form-control" rows=20 id="raw-data-new"></textarea>
+                        </div>
+
+                        <div class="tab-pane fade" id="nav-options" role="tabpanel" aria-labelledby="nav-options-tab">
+                            # TODO: mode, rounding
+                            <h5>
+                                Columns
+                                <button type="button" class="btn btn-primary m-2" id="refresh-col-button">Refresh columns</button>
+                            </h5>
+                            <p class="text-primary">Please select column types below. Drag to reorder columns.</p>
+                            <ul class="list-group" id="col-sel-group"></ul>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="container-fluid m-0 col-8" id="chart-col">
+            <h3 class="m-2">Waterfall Chart <small class="m-2 text-muted">by Jeff Cui (code) and Dr. Jay Huang (math)</small></h3>
+            <p>
+                <button type="button" class="btn btn-primary m-2" id="download-csv-button" disabled>
+                    Download results (CSV)
+                </button>
+                <button type="button" class="btn btn-primary m-2" id="download-png-button" disabled>
+                    Download chart (PNG)
+                </button>
+            </p>
+            <div class="container-fluid m-0 h-75" id="chart-container"></div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-err-msg" tabindex="-1" role="dialog" aria-labelledby="modal-err-msg-label" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modal-err-msg-label">Error</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body" id="modal-err-msg-body">
+                    Oops! Something went wrong.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename="scripts/index.js") }}"></script>
+</body>
+
+</html>
