@@ -7,7 +7,13 @@ def agg_and_calc_mean_rate(df, idx_cols, rate_col, vol_col):
     result = df.copy()
     result[val_col] = result[rate_col] * result[vol_col]
     result = result.groupby(idx_cols)[[val_col, vol_col]].sum()
-    result[rate_col] = result[val_col] / result[vol_col]
+    
+    # Note: how do you handle rate NAs/infs here resulting from sum(volume) == 0 after groupby?
+    # it's probably safe to drop them,
+    # since sum(volume) == 0 means no weight to calculate a weighted mean rate from;
+    # rate NAs could also come from missing rates in the raw data, and we drop them here as well (because they are NAs anyway).
+    result[rate_col] = (result[val_col] / result[vol_col]).replace([np.inf, -np.inf], np.nan)
+    result = result[~result[rate_col].isna()]
     result = result.reset_index()
     return result
 
@@ -37,9 +43,17 @@ def merge_and_impute_missing(df_old, df_new, idx_cols, rate_col='rate', vol_col=
     df.loc[new_rate_NA_mask, rate_col+'_new'] = df.loc[new_rate_NA_mask, rate_col+'_old']
     
     return df
-    
+
 
 def calc_rate(df_old, df_new, idx_cols=[], rate_col='rate', vol_col='vol'):
+    df_old[rate_col] = df_old[rate_col].astype(float)
+    df_old[vol_col] = df_old[vol_col].astype(float)
+    df_new[rate_col] = df_new[rate_col].astype(float)
+    df_new[vol_col] = df_new[vol_col].astype(float)
+    
+    df_old = df_old[~df_old[rate_col].isna()]
+    df_new = df_new[~df_new[rate_col].isna()]
+    
     val_col = 'val'
     if len(idx_cols) > 0:
         df_old = agg_and_calc_mean_rate(df_old, idx_cols, rate_col, vol_col)
@@ -53,6 +67,8 @@ def calc_rate(df_old, df_new, idx_cols=[], rate_col='rate', vol_col='vol'):
             (df_new[rate_col] * df_new[vol_col]).sum() / df_new[vol_col].sum() -
             (df_old[rate_col] * df_old[vol_col]).sum() / df_old[vol_col].sum()
         )
+        if pd.isna(result) or np.isinf(result):
+            result = 0  # since we dropped all rate NAs at the beginning, NAs/infs must come from sum(volume) == 0
     return result
 
 
@@ -133,11 +149,19 @@ def calc_rate_mix(df_old, df_new, idx_cols, rate_col, vol_col, mode='rate', roun
     
     result = []
     if mode == 'rate':
-        result.append(['Last Period', (df_old[vol_col] * df_old[rate_col]).sum() / df_old[vol_col].sum()])
+        last_period_rate = (df_old[vol_col] * df_old[rate_col]).sum() / df_old[vol_col].sum()
+        if pd.isna(last_period_rate) or np.isinf(last_period_rate):
+            last_period_rate = 0
+        result.append(['Last Period', last_period_rate])
+
         result.append([rate_col, rates[-1]])
         for i in range(len(idx_cols)):
             result.append([idx_cols[i], rates[i] - rates[i+1]])
-        result.append(['This Period', (df_new[vol_col] * df_new[rate_col]).sum() / df_new[vol_col].sum()])
+
+        this_period_rate = (df_new[vol_col] * df_new[rate_col]).sum() / df_new[vol_col].sum()
+        if pd.isna(this_period_rate) or np.isinf(this_period_rate):
+            this_period_rate = 0
+        result.append(['This Period', this_period_rate])
     elif mode == 'value':
         df_new_val = (df_new[rate_col] * df_new[vol_col]).sum()
         df_old_val = (df_old[rate_col] * df_old[vol_col]).sum()
