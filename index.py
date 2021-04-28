@@ -36,8 +36,9 @@ def handle_raw():
     rate_col = request.json['rate_col']
     vol_col = request.json['vol_col']
     mode = request.json.get('mode', 'rate')  # default mode is calculate rate
+    round_digits = request.json.get('round_digits', 2)
 
-    rate_mix_result = calc_rate_mix(df_old, df_new, idx_cols, rate_col, vol_col, mode=mode)
+    rate_mix_result = calc_rate_mix(df_old, df_new, idx_cols, rate_col, vol_col, mode=mode, round_digits=round_digits)
     waterfall_result = calc_waterfall_series(rate_mix_result)
 
     result = {
