@@ -23,36 +23,58 @@
         .list-group-item.card.bg-light {
             cursor: default;
         }
+        .btn.active {
+            box-shadow: none;
+        }
     </style>
 </head>
 
 <body style="height: 100%; overflow: hidden;">
     <nav class="navbar navbar-dark bg-dark mb-2">
-        <a class="navbar-brand" href='/'>Variance Analysis (Rate/Mix Waterfall) Toolkit</a>
+        <a class="navbar-brand" href='/'>
+            <i class="fas fa-chart-bar mr-1"></i>
+            Variance Analysis (Rate/Mix Waterfall) Toolkit
+        </a>
     </nav>
 
     <div class="row m-2" style="height: 100%;">
         <div class="container m-0 col-4 pt-2 border-right" style="overflow: auto; height: 90%">
             <nav>
                 <div class="nav nav-tabs nav-fill nav-pills mb-2 border-bottom" id="nav-tab" role="tablist">
-                    <a class="nav-item nav-link active" id="nav-data-old-tab" data-toggle="tab" href="#nav-data-old" role="tab" aria-controls="data-old" aria-selected="true">Data: last period</a>
-                    <a class="nav-item nav-link" id="nav-data-new-tab" data-toggle="tab" href="#nav-data-new" role="tab" aria-controls="data-new" aria-selected="false">Data: this period</a>
-                    <a class="nav-item nav-link" id="nav-options-tab" data-toggle="tab" href="#nav-options" role="tab" aria-controls="options" aria-selected="false">Options</a>
+                    <a class="nav-item nav-link active" id="nav-data-old-tab" data-toggle="tab" href="#nav-data-old" role="tab" aria-controls="data-old" aria-selected="true">
+                        <i class="fas fa-file-csv mr-1"></i>
+                        Last period
+                    </a>
+                    <a class="nav-item nav-link" id="nav-data-new-tab" data-toggle="tab" href="#nav-data-new" role="tab" aria-controls="data-new" aria-selected="false">
+                        <i class="fas fa-file-csv mr-1"></i>
+                        This period
+                    </a>
+                    <a class="nav-item nav-link" id="nav-options-tab" data-toggle="tab" href="#nav-options" role="tab" aria-controls="options" aria-selected="false">
+                        <i class="fas fa-cog mr-2"></i>
+                        Options
+                    </a>
                 </div>
             </nav>
             <form>
                 <div>
                     <div class="input-group mt-2 mb-2 justify-content-end">
-                        <button type="button" class="btn btn-primary" id="submit-button">
+                        <button type="button" class="btn btn-primary" id="submit-button" data-toggle="tooltip" data-placement="bottom" title="Shift + Enter">
                             <div class="spinner-border spinner-border-sm" role="status" id="spinner-running" hidden>
                                 <span class="sr-only">Running...</span>
                             </div>
+                            <i class="fas fa-calculator mr-1"></i>
                             Calculate
                         </button>
                     </div>
                 
                     <div class="tab-content" id="myTabContent">
                         <div class="tab-pane fade show active" id="nav-data-old" role="tabpanel" aria-labelledby="nav-data-old-tab">
+                            <div class="input-group mt-2 mb-2">
+                                <button type="button" class="btn btn-info" id="fill-example-data-old-button">
+                                    <i class="fas fa-table"></i>
+                                    Give me some example data
+                                </button>
+                            </div>
                             <h5>Data: last period</h5>
                             <p class="text-primary"><small>
                                 Choose or paste in CSV.<br />
@@ -60,12 +82,21 @@
                             </small></p>
                             <div class="input-group mb-1">
                                 <input type="file" class="custom-file-input" id="raw-data-old-file-input">
-                                <label class="custom-file-label" for="raw-data-old-file-input" id="raw-data-old-file-label">Choose file</label>
+                                <label class="custom-file-label" for="raw-data-old-file-input" id="raw-data-old-file-label">
+                                    <i class="fas fa-file-csv mr-1"></i>
+                                    Choose file
+                                </label>
                             </div>
                             <textarea class="form-control" rows=20 id="raw-data-old"></textarea>
                         </div>
 
                         <div class="tab-pane fade" id="nav-data-new" role="tabpanel" aria-labelledby="nav-data-new-tab">
+                            <div class="input-group mt-2 mb-2">
+                                <button type="button" class="btn btn-info" id="fill-example-data-new-button">
+                                    <i class="fas fa-table"></i>
+                                    Give me some example data
+                                </button>
+                            </div>
                             <h5>Data: this period</h5>
                             <p class="text-primary"><small>
                                 Choose or paste in CSV.<br />
@@ -73,19 +104,55 @@
                             </small></p>
                             <div class="input-group mb-1">
                                 <input type="file" class="custom-file-input" id="raw-data-new-file-input">
-                                <label class="custom-file-label" for="raw-data-new-file-input" id="raw-data-new-file-label">Choose file</label>
+                                <label class="custom-file-label" for="raw-data-new-file-input" id="raw-data-new-file-label">
+                                    <i class="fas fa-file-csv mr-1"></i>
+                                    Choose file
+                                </label>
                             </div>
                             <textarea class="form-control" rows=20 id="raw-data-new"></textarea>
                         </div>
 
                         <div class="tab-pane fade" id="nav-options" role="tabpanel" aria-labelledby="nav-options-tab">
-                            # TODO: mode, rounding
-                            <h5>
-                                Columns
-                                <button type="button" class="btn btn-primary m-2" id="refresh-col-button">Refresh columns</button>
-                            </h5>
-                            <p class="text-primary">Please select column types below. Drag to reorder columns.</p>
-                            <ul class="list-group" id="col-sel-group"></ul>
+                            <div class="container mb-3" id="options-mode">
+                                <h5>
+                                    <i class="fas fa-calculator mr-1"></i>
+                                    Mode
+                                </h5>
+                                <div class="btn-group-toggle mt-2" data-toggle="buttons">
+                                    <label class="btn btn-outline-primary active" id="options-mode-btn-rate" data-toggle="tooltip" data-placement="bottom" title="e.g. average clicks per user, average sales price">
+                                        <input type="radio" name="options-mode-radio" id="options-mode-radio-rate" value="rate" checked>
+                                        Average Rate Difference
+                                    </label>
+                                    <label class="btn btn-outline-primary" id="options-mode-btn-value" data-toggle="tooltip" data-placement="bottom" title="e.g. total user clicks, total sales revenue">
+                                        <input type="radio" name="options-mode-radio" id="options-mode-radio-value" value="value">
+                                        Total Value Difference
+                                    </label>
+                                </div>
+                                <div class="input-group mt-2">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text">Round to </span>
+                                    </div>
+                                    <input type="number" min=0 max=15 value=2 class="form-control" id="options-mode-round-digits">
+                                    <div class="input-group-append">
+                                        <span class="input-group-text">digits</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr/>
+
+                            <div class="container mt-2" id="options-cols">
+                                <h5>
+                                    <i class="fas fa-columns mr-1"></i>
+                                    Columns
+                                    <button type="button" class="btn btn-primary m-2" id="refresh-col-button">
+                                        <i class="fa fa-refresh mr-1"></i>
+                                        Refresh
+                                    </button>
+                                </h5>
+                                <p class="text-primary">Please select column types below. Drag to reorder the columns.</p>
+                                <ul class="list-group" id="col-sel-group"></ul>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -93,13 +160,17 @@
         </div>
 
         <div class="container-fluid m-0 col-8" id="chart-col">
-            <h3 class="m-2">Waterfall Chart <small class="m-2 text-muted">by Jeff Cui (code) and Dr. Jay Huang (math)</small></h3>
+            <h3 class="m-2">
+                Waterfall Chart <small class="m-2 text-muted">by Jeff Cui (code) and Dr. Jay Huang (math)</small>
+            </h3>
             <p>
-                <button type="button" class="btn btn-primary m-2" id="download-csv-button" disabled>
-                    Download results (CSV)
+                <button type="button" class="btn btn-primary ml-2 mt-2" id="download-csv-button" disabled>
+                    <i class="fas fa-download mr-1"></i>
+                    Results (CSV)
                 </button>
-                <button type="button" class="btn btn-primary m-2" id="download-png-button" disabled>
-                    Download chart (PNG)
+                <button type="button" class="btn btn-primary mt-2" id="download-png-button" disabled>
+                    <i class="fas fa-download mr-1"></i>
+                    Chart (PNG)
                 </button>
             </p>
             <div class="container-fluid m-0 h-75" id="chart-container"></div>
