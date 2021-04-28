@@ -2,6 +2,34 @@ var pred = {};
 var pred_csv = '';
 var colID = 0;
 
+var example_dfOld = `Brand,Subbrand,SKU,NR/HL,HL
+a,ac,acg,20,25
+a,ac,ach,25,5
+a,ad,adi,40,10
+a,ad,adj,50,100
+b,be,bek,10,5
+b,be,bel,20,5
+b,bf,bfm,10,5
+b,bf,bfn,20,50
+`
+var example_dfNew = `Brand,Subbrand,SKU,NR/HL,HL
+a,ac,acg,20,50
+a,ac,ach,30,50
+a,ad,adi,40,50
+a,ad,adj,50,50
+b,be,bek,10,100
+b,be,bel,10,100
+b,bf,bfm,20,100
+b,bf,bfn,20,100
+`
+// https://stackoverflow.com/questions/31128855/comparing-ecma6-sets-for-equality
+// lol you have to roll your own set equality function in JS
+function eqSet(as, bs) {
+    if (as.size !== bs.size) return false;
+    for (var a of as) if (!bs.has(a)) return false;
+    return true;
+}
+
 function parseData(text) {
     var result = Papa.parse(text, config={'dynamicTyping': true, skipEmptyLines: true, 'header': true}).data;
     return result;
@@ -9,10 +37,8 @@ function parseData(text) {
 
 
 function generateOptions(pred) {
+    var barWidth = "50%";
     var options = {
-        title: {
-            text: 'Waterfall Chart',
-        },
         tooltip : {
             trigger: 'axis',
             axisPointer : {
@@ -41,7 +67,7 @@ function generateOptions(pred) {
         xAxis: {
             type : 'category',
             splitLine: {show:false},
-            data : pred['waterfall']['xlabel'],
+            data : pred['xlabel'],
             offset: 10,
         },
         yAxis: {
@@ -62,7 +88,8 @@ function generateOptions(pred) {
                         color: 'rgba(0,0,0,0)'
                     }
                 },
-                data: pred['waterfall']['support'],
+                data: pred['support'],
+                barWidth: barWidth,
             },
             {
                 name: 'Last Period',
@@ -75,7 +102,8 @@ function generateOptions(pred) {
                     },
                 },
                 color: 'rgba(0,0,0,1)',
-                data: pred['waterfall']['last'],
+                data: pred['last'],
+                barWidth: barWidth,
             },
             {
                 name: 'This Period',
@@ -88,7 +116,8 @@ function generateOptions(pred) {
                     },
                 },
                 color: 'rgba(0,0,128,1)',
-                data: pred['waterfall']['this'],
+                data: pred['this'],
+                barWidth: barWidth,
             },
             {
                 name: 'Positive',
@@ -101,7 +130,8 @@ function generateOptions(pred) {
                     }
                 },
                 color: 'rgba(0,128,0,1)',
-                data: pred['waterfall']['pos']
+                data: pred['pos'],
+                barWidth: barWidth,
             },
             {
                 name: 'Negative',
@@ -114,7 +144,8 @@ function generateOptions(pred) {
                     }
                 },
                 color: 'rgba(128, 0, 0, 1)',
-                data: pred['waterfall']['neg']
+                data: pred['neg'],
+                barWidth: barWidth,
             }
         ]
     }
@@ -128,11 +159,6 @@ function renderChart(pred) {
 
 function parseColTypes() {
     var cols = $('#col-sel-group').find('li');
-    if (cols.length == 0) {
-        refreshColumns();
-        $('#nav-options-tab').click();
-        throw 'Please select column types in Options. Drag to reorder the columns.';
-    }
     var colNames = [];
     var colTypes = [];
     cols.each(function () {
@@ -167,7 +193,10 @@ function parseColTypes() {
 function generateRequest() {
     var dfOld = parseData($('#raw-data-old')[0].value);
     var dfNew = parseData($('#raw-data-new')[0].value);
+    var mode = $(':radio[name=options-mode-radio]:checked').val();
+    var round_digits = parseInt($('#options-mode-round-digits').val());
 
+    checkValidity();
     colTypes = parseColTypes();
     var result = {
         'df_old': dfOld,
@@ -175,7 +204,8 @@ function generateRequest() {
         'idx_cols': colTypes['idx_cols'],
         'rate_col': colTypes['rate_col'],
         'vol_col': colTypes['vol_col'],
-        'mode': 'value',
+        'mode': mode,
+        'round_digits': round_digits,
     };
     return result;
 }
@@ -209,6 +239,8 @@ function enableDownloadButtons() {
 
 function sendRequest() {
     try {
+        disableSubmitButton();
+        disableDownloadButtons();
         var requestData = generateRequest();
         $.ajax('/variance-analysis/api/v1/raw', {
             data: JSON.stringify(requestData),
@@ -216,7 +248,8 @@ function sendRequest() {
             dataType: 'json',
             method: 'POST',
             success: (data, status, xhr) => {
-                pred = data;
+                pred = data['waterfall'];
+                pred_csv = Papa.unparse(data['raw']);
                 renderChart(pred);
                 enableSubmitButton();
                 enableDownloadButtons();
@@ -301,19 +334,14 @@ function addColumn(colname) {
 }
 
 function refreshColumns() {
-    // empty current col list
-    $('#col-sel-group').empty();
-    colID = 0;
     // optimization opportunity:
     // data is parsed twice (once for request, once for refresh column)
     var dfOld = parseData($('#raw-data-old')[0].value);
     var dfNew = parseData($('#raw-data-new')[0].value);
-
     var dfOldCols = Object.keys(dfOld[0]);
     var dfNewCols = Object.keys(dfNew[0]);
-    var cols = [];
 
-    // avoiding sets to preserve order; there's probably a better way to do this
+    var cols = [];  // avoiding sets to preserve order; there's probably a better way to do this
     for (let [i, elem] of dfOldCols.entries()) {
         if (dfNewCols.includes(elem) & !(cols.includes(elem))) {
             cols.push(elem);
@@ -324,8 +352,18 @@ function refreshColumns() {
             cols.push(elem);
         }
     }
-    for (let [i, elem] of cols.entries()) {
-        addColumn(elem);
+
+    var currentColSet = new Set($('#col-sel-group').find('h5').map(function() {return this.innerText}));
+    var colSet = new Set(cols);
+
+    // if two sets are not equal, update the columns
+    if (!eqSet(currentColSet, colSet)) {
+        // empty current col list
+        $('#col-sel-group').empty();
+        colID = 0;
+        for (let [i, elem] of cols.entries()) {
+            addColumn(elem);
+        }
     }
 }
 
@@ -337,12 +375,15 @@ function dataTypeRadioCallback() {
         // there can only be one rate column
         otherCols.closest('.btn-group-toggle').find(':radio[value=na]').click();
         // move rate column to the start of the list
-        colCard.slideUp(200, () => {
-            colCard.detach();
-            $('#col-sel-group').prepend(colCard);
-            colCard.slideDown(200);
-        });
-        // disable sorting for this element
+        if (colCard.index() != 0) {
+            colCard.slideUp(200, () => {
+                colCard.detach();
+                $('#col-sel-group').prepend(colCard);
+                colCard.slideDown(200);
+            });
+        }
+        // disable sorting for this element, set bg-light color visual cue
+        // ('.bg-light' used by SortableJS filter as unsortable)
         colCard.addClass('bg-light');
         colCard.find('i').hide();
     }
@@ -350,13 +391,14 @@ function dataTypeRadioCallback() {
         // there can only be one volume column
         otherCols.closest('.btn-group-toggle').find(':radio[value=na]').click();
         // move volume column to the end of the list
-        colCard.slideUp(200, () => {
-            colCard.detach();
-            $('#col-sel-group').append(colCard);
-            colCard.slideDown(200);
-        });
-        // disable sorting for this element, set bg-light color visual cue
-        // ('.bg-light' used by SortableJS filter as unsortable)
+        if (!(colCard.index() == colCard.siblings().length)) {
+            // not at the end; play animation and move
+            colCard.slideUp(200, () => {
+                colCard.detach();
+                $('#col-sel-group').append(colCard);
+                colCard.slideDown(200);
+            });
+        }
         colCard.addClass('bg-light');
         colCard.find('i').hide();
     }
@@ -374,7 +416,20 @@ function showError(msg = 'Oops! Something went wrong.') {
 }
 
 function checkValidity() {
+    if ($('#raw-data-old')[0].value.length == 0) {
+        $('#nav-data-old-tab').click();
+        throw "Missing: last period data."
+    }
+    if ($('#raw-data-new')[0].value.length == 0) {
+        $('#nav-data-new-tab').click();
+        throw "Missing: this period data."
+    }
     var colTypes = parseColTypes();
+    if ((colTypes['rate_col'] == '') & (colTypes['vol_col'] == '') & (colTypes['idx_cols'].length == 0)) {
+        refreshColumns();
+        $('#nav-options-tab').click();
+        throw 'Please select column types in Options. Drag to reorder the columns.';
+    }
     if (colTypes['rate_col'] == '') {
         $('#nav-options-tab').click();
         throw "Please specify the rate column."
@@ -397,15 +452,7 @@ $('#raw-data-new-file-input').change(() => {
 });
 
 $('#submit-button').on('click', () => {
-    try {
-        if (checkValidity()) {
-            disableSubmitButton();
-            disableDownloadButtons();
-            sendRequest();
-        }
-    } catch (e) {
-        showError(e);
-    }
+    sendRequest();
 });
 
 $('#download-csv-button').on('click', () => {
@@ -419,8 +466,32 @@ $("#download-png-button").click(() => {
     a.click();
 })
 
+$('#fill-example-data-old-button').on('click', () => {
+    $('#raw-data-old').val(example_dfOld);
+    refreshColumns();
+})
+$('#fill-example-data-new-button').on('click', () => {
+    $('#raw-data-new').val(example_dfNew);
+    refreshColumns();
+})
+
 $('#refresh-col-button').click(refreshColumns);
+$('[data-toggle="tooltip"]').tooltip({trigger: 'hover'});  // init all tooltips
 
 var chartContainer = $('#chart-container')[0];
 var myChart = echarts.init(chartContainer);
-var cols = new Sortable($('#col-sel-group')[0], {animation: 150, ghostClass: 'bg-secondary', filter: '.bg-light'});
+var cols = new Sortable(
+    $('#col-sel-group')[0],
+    {
+        animation: 150,
+        ghostClass: 'bg-secondary',
+        dragClass: 'bg-light',
+        filter: '.bg-light',
+    }
+);
+
+$(document).bind('keydown', function(e) {
+    if (e.shiftKey & (e.key == 'Enter')) {
+        sendRequest();
+    }
+})
