@@ -133,11 +133,11 @@ def calc_rate_mix(df_old, df_new, idx_cols, rate_col, vol_col, mode='rate', roun
     
     result = []
     if mode == 'rate':
-        result.append(['last', (df_old[vol_col] * df_old[rate_col]).sum() / df_old[vol_col].sum()])
+        result.append(['Last Period', (df_old[vol_col] * df_old[rate_col]).sum() / df_old[vol_col].sum()])
         result.append([rate_col, rates[-1]])
         for i in range(len(idx_cols)):
             result.append([idx_cols[i], rates[i] - rates[i+1]])
-        result.append(['this', (df_new[vol_col] * df_new[rate_col]).sum() / df_new[vol_col].sum()])
+        result.append(['This Period', (df_new[vol_col] * df_new[rate_col]).sum() / df_new[vol_col].sum()])
     elif mode == 'value':
         df_new_val = (df_new[rate_col] * df_new[vol_col]).sum()
         df_old_val = (df_old[rate_col] * df_old[vol_col]).sum()
@@ -145,7 +145,7 @@ def calc_rate_mix(df_old, df_new, idx_cols, rate_col, vol_col, mode='rate', roun
         rate = rates[-1] * df_old_vol
         vol_impact = df_new_val - df_old_val - rate
         
-        result.append(['last', df_old_val])
+        result.append(['Last Period', df_old_val])
         result.append([rate_col, rate])
         for i in range(len(idx_cols)):
             this_impact = (rates[i] - rates[i+1]) * df_old_vol
@@ -153,7 +153,7 @@ def calc_rate_mix(df_old, df_new, idx_cols, rate_col, vol_col, mode='rate', roun
             result.append([idx_cols[i], this_impact])
         
         result.append([vol_col, vol_impact])
-        result.append(['this', df_new_val])
+        result.append(['This Period', df_new_val])
     
     result = [[x[0], round(float(x[1]), round_digits)] for x in result]
     return result
