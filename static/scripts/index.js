@@ -196,7 +196,7 @@ function generateRequest() {
     var mode = $(':radio[name=options-mode-radio]:checked').val();
     var round_digits = parseInt($('#options-mode-round-digits').val());
 
-    checkValidity();
+    checkValidity(dfOld, dfNew);
     colTypes = parseColTypes();
     var result = {
         'df_old': dfOld,
@@ -250,11 +250,15 @@ function sendRequest() {
             success: (data, status, xhr) => {
                 pred = data['waterfall'];
                 pred_csv = Papa.unparse(data['raw']);
+                warnings = data['warnings'];
                 renderChart(pred);
                 enableSubmitButton();
                 enableDownloadButtons();
+                if (warnings.length > 0) {
+                    showError(warnings);
+                }
             },
-            error: () => {
+            error: (e) => {
                 enableSubmitButton();
                 disableDownloadButtons();
                 showError('Oops! Something went wrong.');
@@ -415,7 +419,7 @@ function showError(msg = 'Oops! Something went wrong.') {
     $('#modal-err-msg').modal();
 }
 
-function checkValidity() {
+function checkValidity(dfOld, dfNew) {
     if ($('#raw-data-old')[0].value.length == 0) {
         $('#nav-data-old-tab').click();
         throw "Missing: last period data."
