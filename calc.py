@@ -67,8 +67,8 @@ def calc_rate(df_old, df_new, idx_cols=[], rate_col='rate', vol_col='vol'):
             (df_new[rate_col] * df_new[vol_col]).sum() / df_new[vol_col].sum() -
             (df_old[rate_col] * df_old[vol_col]).sum() / df_old[vol_col].sum()
         )
-        if pd.isna(result) or np.isinf(result):
-            result = 0  # since we dropped all rate NAs at the beginning, NAs/infs must come from sum(volume) == 0
+    if pd.isna(result) or np.isinf(result):
+        result = 0  # since we dropped all rate NAs at the beginning, NAs/infs must come from sum(volume) == 0
     return result
 
 
